@@ -1,4 +1,5 @@
 const express = require("express")
+const expenseRoutes = require("./routes/expense.routes")
 
 const app = express()
 
@@ -8,5 +9,6 @@ app.get("/health", (req, res) =>{
     res.json({status: "ok"})
 });
 
+app.use("/expenses", expenseRoutes)
 module.exports = app;
 

@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 import pandas as pd
+import model as ai_model
+from train_model import train_model
 
 app = FastAPI()
 
@@ -38,3 +40,23 @@ def analyze(expenses: list[Expense]):
         "category_breakdown": category_breakdown.to_dict(),
         "biggest_expense": biggest_expense.to_dict()
     }
+
+class PredictionRequest(BaseModel):
+    description: str
+
+@app.post("/predict-category")
+def predict(data: PredictionRequest):
+
+    category = ai_model.predict_category(data.description)
+
+    return {
+        "description": data.description,
+        "predicted_category": category
+    }
+
+@app.post("/retrain")
+def retrain():
+
+    ai_model.model, ai_model.vectorizer = train_model()
+
+    return {"message": "model retrained"}

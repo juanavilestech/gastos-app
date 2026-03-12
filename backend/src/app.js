@@ -2,6 +2,8 @@ const express = require("express");
 const pool = require("./config/db");
 const expenseRoutes = require("./routes/expense.routes");
 const errorHandler = require("./middlewares/error.middleware");
+const aiRoutes = require("./routes/ai.routes");
+
 
 const app = express();
 
@@ -26,6 +28,8 @@ app.get("/test-db", async (req, res) => {
 });
 
 app.use("/expenses", expenseRoutes);
+app.use("/ai", aiRoutes);
+
 
 app.use(errorHandler);
 

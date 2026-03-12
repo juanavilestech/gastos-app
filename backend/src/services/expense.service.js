@@ -1,6 +1,7 @@
 const Expense = require("../models/expense.model");
 const AppError = require("../utils/AppError");
 const { expenseSchema } = require("../schemas/expense.schema");
+const aiService = require("./ai.service");
 
 exports.findAll = async () => {
   const expenses = await Expense.findAll();
@@ -22,7 +23,28 @@ exports.create = async (data) => {
   // Validar con Zod
   const validatedData = expenseSchema.parse(data);
 
-  const newExpense = await Expense.create(validatedData);
+  let category = validatedData.category;
+
+  // Si no viene categoría pero sí descripción → usar IA
+  if (!category && validatedData.description) {
+    try {
+      category = await aiService.predictCategory(validatedData.description);
+    } catch (error) {
+      console.error("AI prediction failed:", error.message);
+    }
+  }
+
+  const newExpense = await Expense.create({
+    ...validatedData,
+    category: category || "Otros",
+  });
+
+  // Reentrenar modelo después de guardar
+  try {
+    await aiService.retrainModel();
+  } catch (error) {
+    console.error("AI retrain failed:", error.message);
+  }
 
   return newExpense;
 };

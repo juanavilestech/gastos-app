@@ -22,7 +22,8 @@ const errorHandler = (err, req, res, next) => {
   if (err.name === "ZodError") {
     err.statusCode = 400;
     err.status = "fail";
-    err.message = err.errors
+    const issues = err.errors || err.issues || [];
+    err.message = issues
       .map((e) => `${e.path.join(".")}: ${e.message}`)
       .join(", ");
   }

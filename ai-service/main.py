@@ -1,12 +1,13 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
-<<<<<<< HEAD
-from typing import List
+from pydantic import BaseModel, ConfigDict
+from typing import List, Optional
 from fastapi.middleware.cors import CORSMiddleware
+import pandas as pd
+import model as ai_model
+from train_model import train_model
 
 app = FastAPI()
 
-# Enable CORS for the frontend/backend to call this service
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,12 +17,19 @@ app.add_middleware(
 )
 
 class Expense(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    
     amount: float
     category: str
-    description: str
+    description: Optional[str] = None
     date: str
+    type: Optional[str] = 'gasto'
 
 class AnalysisRequest(BaseModel):
+    expenses: List[Expense]
+
+class AskRequest(BaseModel):
+    question: str
     expenses: List[Expense]
 
 @app.get("/")
@@ -30,94 +38,149 @@ def read_root():
 
 @app.post("/analyze")
 async def analyze_expenses(request: AnalysisRequest):
-    # Mock analysis logic
+    # If no expenses, return simple message
     if not request.expenses:
         return {"summary": "No hay gastos registrados", "advice": "¡Empieza registrando un gasto!"}
 
-    total = sum(e.amount for e in request.expenses)
-    categories: dict[str, float] = {}
-    for e in request.expenses:
-        categories[e.category] = categories.get(e.category, 0.0) + e.amount
+    # Convert to DataFrame for advanced analysis
+    data = [e.dict() for e in request.expenses]
+    df = pd.DataFrame(data)
+    df['date'] = pd.to_datetime(df['date'])
     
-    # Simple advice logic
-    top_category = max(categories, key=lambda k: categories[k]) if categories else "N/A"
+    total = float(df["amount"].sum())
+    avg_expense = float(df["amount"].mean())
+    category_breakdown = df.groupby("category")["amount"].sum().to_dict()
+    top_category = df.groupby("category")["amount"].sum().idxmax()
     
+    # Simple anomaly detection: any expense > 2x average
+    anomalies = df[df["amount"] > avg_expense * 2].to_dict(orient="records")
+    
+    # Projection to end of month (assuming 30 days)
+    days_recorded = (df['date'].max() - df['date'].min()).days + 1
+    daily_avg = total / days_recorded if days_recorded > 0 else total
+    projected_total = daily_avg * 30
+    
+    # Generate actionable advice
+    advice = []
     if total > 1000:
-        advice = f"Tus gastos totales (${total:.2f}) son elevados. Tu mayor gasto es en '{top_category}'. ¿Podrías reducirlo?"
-    elif total > 0:
-        advice = "Tus finanzas se ven saludables. Mantén el registro para obtener mejores proyecciones."
+        advice.append(f"Tus gastos totales (${total:.2f}) están subiendo. Prioriza reducir en '{top_category}'.")
+    
+    if anomalies:
+        advice.append(f"He detectado {len(anomalies)} gastos inusualmente altos que podrías revisar.")
+        
+    if projected_total > 1500:
+        advice.append(f"A este ritmo, podrías terminar el mes gastando aproximadamente ${projected_total:.2f}. ¡Cuidado!")
     else:
-        advice = "Aún no tienes gastos para analizar."
+        advice.append("Tus finanzas se ven saludables y bajo control.")
         
     return {
         "total_amount": total,
+        "average_expense": avg_expense,
         "top_category": top_category,
-        "summary": f"Resumen: ${total:.2f} gastados en total.",
-        "advice": advice
+        "category_breakdown": category_breakdown,
+        "projected_end_of_month": float(projected_total),
+        "anomalies": anomalies,
+        "summary": f"Resumen: ${total:.2f} gastados hasta hoy.",
+        "advice": " ".join(advice)
     }
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-=======
-import pandas as pd
-import model as ai_model
-from train_model import train_model
+@app.post("/ask")
+async def ask_question(request: AskRequest):
+    if not request.expenses:
+        return {"answer": "No hay gastos registrados. ¡Empieza registrando tus gastos para poder ayudarte!"}
 
-app = FastAPI()
+    df = pd.DataFrame([e.dict() for e in request.expenses])
+    df['date'] = pd.to_datetime(df['date'])
+    df['amount'] = df['amount'].astype(float)
+    df['type'] = df['type'].fillna('gasto')
 
-class Expense(BaseModel):
-    amount: float
-    category: str
-    description: str | None = None
-    date: str
+    question_lower = request.question.lower()
+    answer = ""
 
-@app.get("/")
-def root():
-    return {"message": "AI service running"}
+    total_gastos = df[df['type'] != 'ingreso']['amount'].sum()
+    total_ingresos = df[df['type'] == 'ingreso']['amount'].sum()
+    balance = total_ingresos - total_gastos
 
-@app.post("/analyze")
-def analyze(expenses: list[Expense]):
+    category_totals = df[df['type'] != 'ingreso'].groupby('category')['amount'].sum().sort_values(ascending=False)
 
-    data = [e.dict() for e in expenses]
+    if any(word in question_lower for word in ['gasté', 'gaste', 'gastos totales', 'total']):
+        answer = f"Has gastado un total de ${total_gastos:,.2f} MXN."
+        if not category_totals.empty:
+            answer += f" Tu categoría con más gastos es '{category_totals.index[0]}' con ${category_totals.iloc[0]:,.2f}."
 
-    df = pd.DataFrame(data)
+    elif any(word in question_lower for word in ['ingres', 'sueldo', 'gané', 'gane']):
+        answer = f"Tus ingresos totales son ${total_ingresos:,.2f} MXN."
+        if balance >= 0:
+            answer += f" Tu balance es positivo: ${balance:,.2f} MXN."
+        else:
+            answer += f" Tu balance es negativo: ${abs(balance):,.2f} MXN."
 
-    total_spent = df["amount"].sum()
+    elif any(word in question_lower for word in ['categoría', 'categoria', 'más gast', 'mayor']):
+        if not category_totals.empty:
+            top3 = category_totals.head(3)
+            answer = "Tus categorías con más gastos son:\n"
+            for cat, amount in top3.items():
+                answer += f"• {cat}: ${amount:,.2f} MXN\n"
+        else:
+            answer = "No hay gastos registrados por categoría."
 
-    avg_expense = df["amount"].mean()
+    elif any(word in question_lower for word in ['reducir', 'ahorrar', 'consejo', 'tips', 'sugeren']):
+        if not category_totals.empty:
+            top = category_totals.index[0]
+            avg = category_totals.mean()
+            if category_totals.iloc[0] > avg * 1.5:
+                answer = f"Te recomiendo reducir gastos en '{top}'. Es tu categoría más alta y supera el promedio por un margen considerable."
+            else:
+                answer = "Tus gastos están bastante equilibrados. Sigue así y considera crear un fondo de emergencia."
+        else:
+            answer = "Registra más gastos para darte consejos personalizados."
 
-    category_breakdown = df.groupby("category")["amount"].sum()
+    elif any(word in question_lower for word in ['balance', 'sobra', 'queda', 'restante']):
+        answer = f"Tu balance actual es ${balance:,.2f} MXN."
+        if balance < 0:
+            answer += " Cuidado, estás gastando más de lo que ganas."
+        else:
+            answer += " ¡Bien! Estás ahorrando."
 
-    top_category = category_breakdown.idxmax()
+    elif any(word in question_lower for word in ['semana', 'semanal']):
+        df['week'] = df['date'].dt.isocalendar().week
+        week_avg = df[df['type'] != 'ingreso'].groupby('week')['amount'].sum().mean()
+        answer = f"Tu promedio de gastos semanales es aproximadamente ${week_avg:,.2f} MXN."
 
-    biggest_expense = df.loc[df["amount"].idxmax()]
+    elif any(word in question_lower for word in ['mes', 'mensual']):
+        days_in_month = 30
+        days_recorded = (df['date'].max() - df['date'].min()).days + 1 if len(df) > 1 else 1
+        daily_avg = total_gastos / days_recorded
+        projected = daily_avg * days_in_month
+        answer = f"A este ritmo, proyectarías aproximadamente ${projected:,.2f} MXN en gastos al mes."
 
-    return {
-        "total_spent": float(total_spent),
-        "average_expense": float(avg_expense),
-        "top_category": top_category,
-        "category_breakdown": category_breakdown.to_dict(),
-        "biggest_expense": biggest_expense.to_dict()
-    }
+    else:
+        answer = f"Tengo {len(df)} gastos registrados. Puedo ayudarte con preguntas sobre: gastos totales, categorías, balance, consejos para ahorrar, proyección mensual y más. ¿Qué te gustaría saber?"
+
+    return {"question": request.question, "answer": answer}
 
 class PredictionRequest(BaseModel):
     description: str
 
 @app.post("/predict-category")
 def predict(data: PredictionRequest):
-
-    category = ai_model.predict_category(data.description)
-
-    return {
-        "description": data.description,
-        "predicted_category": category
-    }
+    try:
+        category = ai_model.predict_category(data.description)
+        return {
+            "description": data.description,
+            "predicted_category": category
+        }
+    except Exception as e:
+        return {"error": str(e), "description": data.description, "predicted_category": "Ocupaciones"}
 
 @app.post("/retrain")
 def retrain():
+    try:
+        ai_model.model, ai_model.vectorizer = train_model()
+        return {"message": "model retrained"}
+    except Exception as e:
+        return {"error": str(e), "message": "retraining failed"}
 
-    ai_model.model, ai_model.vectorizer = train_model()
-
-    return {"message": "model retrained"}
->>>>>>> 9e02315212045fcec4d7b25fdf083c440be46067
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

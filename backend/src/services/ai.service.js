@@ -17,3 +17,13 @@ exports.retrainModel = async () => {
 
 };
 
+exports.analyzeExpenses = async (expenses) => {
+  const response = await axios.post("http://localhost:8000/analyze", { expenses });
+  return response.data;
+};
+
+exports.askQuestion = async (question, expenses) => {
+  const response = await axios.post("http://localhost:8000/ask", { question, expenses });
+  return response.data;
+};
+

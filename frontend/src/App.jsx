@@ -1,4 +1,4 @@
-import { getExpenses, createExpense, getCategories } from "./api";
+import { getExpenses, createExpense, getCategories, askAI } from "./api";
 import React, { useState, useEffect } from "react";
 import "./App.css";
 import { 
@@ -16,7 +16,10 @@ import {
   ArrowUpRight,
   TrendingUp,
   CreditCard,
-  Target
+  Target,
+  SendHorizonal,
+  Bot,
+  Sparkles
 } from "lucide-react";
 import { 
   AreaChart, 
@@ -46,6 +49,9 @@ function App() {
   const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [modalType, setModalType] = useState('gasto');
+  const [aiQuestion, setAiQuestion] = useState('');
+  const [aiMessages, setAiMessages] = useState([]);
+  const [isAiLoading, setIsAiLoading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -80,6 +86,27 @@ function App() {
     } catch (error) {
        alert("Error al guardar la transacción");
     }
+  };
+
+  const handleAskAI = async (e) => {
+    e.preventDefault();
+    if (!aiQuestion.trim()) return;
+
+    const userMessage = { role: 'user', text: aiQuestion };
+    setAiMessages(prev => [...prev, userMessage]);
+    setAiQuestion('');
+    setIsAiLoading(true);
+
+    try {
+      const response = await askAI(aiQuestion);
+      const aiMessage = { role: 'ai', text: response.answer };
+      setAiMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      const errorMessage = { role: 'ai', text: 'Lo siento, no pude procesar tu pregunta. Intenta de nuevo.' };
+      setAiMessages(prev => [...prev, errorMessage]);
+    }
+
+    setIsAiLoading(false);
   };
 
   const totalIncomes = expenses.filter(e => e.type === 'ingreso').reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
@@ -150,9 +177,13 @@ function App() {
             {activeTab === 'expenses' && <motion.div layoutId="nav-active" className="nav-active-pill" />}
           </button>
           
-          <button className="nav-item">
+          <button 
+            className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`}
+            onClick={() => setActiveTab('reports')}
+          >
             <BarChart3 size={20} />
             <span>Reportes</span>
+            {activeTab === 'reports' && <motion.div layoutId="nav-active" className="nav-active-pill" />}
           </button>
         </nav>
 
@@ -343,6 +374,84 @@ function App() {
                     )}
                  </tbody>
                </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'reports' && (
+          <div className="reports-view animate-fade-in">
+            <div className="ai-assistant-container glass">
+              <div className="ai-header">
+                <div className="ai-title">
+                  <Sparkles size={24} className="ai-icon" />
+                  <h2>Asistente Financiero IA</h2>
+                </div>
+                <p className="ai-subtitle">Pregunta sobre tus gastos en lenguaje natural</p>
+              </div>
+
+              <div className="ai-chat-container">
+                {aiMessages.length === 0 && (
+                  <div className="ai-suggestions">
+                    <p className="suggestion-label">Preguntas sugeridas:</p>
+                    <div className="suggestion-chips">
+                      <button onClick={() => setAiQuestion('¿Cuánto gasté en total?')} className="chip">¿Cuánto gasté en total?</button>
+                      <button onClick={() => setAiQuestion('¿Cuáles son mis categorías con más gastos?')} className="chip">¿Categorías con más gastos?</button>
+                      <button onClick={() => setAiQuestion('¿Cómo está mi balance?')} className="chip">¿Cómo está mi balance?</button>
+                      <button onClick={() => setAiQuestion('¿Qué me recomiendas para ahorrar?')} className="chip">¿Cómo ahorrar más?</button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="ai-messages">
+                  <AnimatePresence>
+                    {aiMessages.map((msg, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`ai-message ${msg.role}`}
+                      >
+                        <div className="message-avatar">
+                          {msg.role === 'ai' ? <Bot size={20} /> : <span>U</span>}
+                        </div>
+                        <div className="message-content">
+                          {msg.text.split('\n').map((line, i) => (
+                            <p key={i}>{line}</p>
+                          ))}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                  {isAiLoading && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="ai-message ai"
+                    >
+                      <div className="message-avatar"><Bot size={20} /></div>
+                      <div className="message-content typing">
+                        <span className="dot"></span>
+                        <span className="dot"></span>
+                        <span className="dot"></span>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+
+              <form onSubmit={handleAskAI} className="ai-input-form">
+                <input
+                  type="text"
+                  value={aiQuestion}
+                  onChange={(e) => setAiQuestion(e.target.value)}
+                  placeholder="Ej: ¿Cuánto gasté esta semana?"
+                  className="ai-input"
+                  disabled={isAiLoading}
+                />
+                <button type="submit" className="ai-send-btn" disabled={isAiLoading || !aiQuestion.trim()}>
+                  <SendHorizontal size={20} />
+                </button>
+              </form>
             </div>
           </div>
         )}

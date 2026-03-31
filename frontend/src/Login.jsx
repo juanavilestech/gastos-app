@@ -38,7 +38,7 @@ const Login = ({ onLogin }) => {
             <div className="logo-icon glow-purple">
               <Wallet size={32} color="#8b5cf6" />
             </div>
-            <span className="logo-text gradient-text">GastosApp</span>
+            <span className="logo-text gradient-text">IntelliGastos</span>
           </div>
           <h1>Bienvenido de nuevo</h1>
           <p className="text-secondary">

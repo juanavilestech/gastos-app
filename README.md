@@ -1,4 +1,4 @@
-# GastosApp
+# IntelliGastos
 
 Aplicación web para el registro y análisis de gastos personales con asistencia de IA.
 
@@ -72,6 +72,7 @@ npm run dev
 ## Configuración de entorno
 
 ### Backend (.env)
+
 ```
 PORT=3001
 DB_HOST=localhost
@@ -89,5 +90,3 @@ AI_SERVICE_URL=http://localhost:8000
 2. Accede a la aplicación en `http://localhost:5173`
 3. Inicia sesión o regístrate
 4. Comienza a registrar tus transacciones
-
-

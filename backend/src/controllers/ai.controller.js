@@ -25,3 +25,22 @@ exports.ask = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.predictCategory = async (req, res, next) => {
+  try {
+    const { description } = req.body;
+    const predictedCategory = await aiService.predictCategory(description);
+    res.json({ description, predicted_category: predictedCategory });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.retrain = async (req, res, next) => {
+  try {
+    await aiService.retrainModel();
+    res.json({ status: "success", message: "model retrained" });
+  } catch (error) {
+    next(error);
+  }
+};

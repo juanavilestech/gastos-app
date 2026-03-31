@@ -4,6 +4,8 @@ const expenseRoutes = require("./routes/expense.routes");
 const categoryRoutes = require("./routes/category.routes");
 const errorHandler = require("./middlewares/error.middleware");
 const aiRoutes = require("./routes/ai.routes");
+const authRoutes = require("./routes/auth.routes");
+const authMiddleware = require("./middlewares/auth.middleware");
 
 const cors = require("cors");
 const app = express();
@@ -14,7 +16,7 @@ app.get("/health", (req, res) => {
   res.status(200).json({
     status: "ok",
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
   });
 });
 
@@ -28,9 +30,10 @@ app.get("/test-db", async (req, res) => {
   }
 });
 
-app.use("/expenses", expenseRoutes);
-app.use("/categories", categoryRoutes);
-app.use("/ai", aiRoutes);
+app.use("/auth", authRoutes);
+app.use("/expenses", authMiddleware, expenseRoutes);
+app.use("/categories", authMiddleware, categoryRoutes);
+app.use("/ai", authMiddleware, aiRoutes);
 
 app.use(errorHandler);
 

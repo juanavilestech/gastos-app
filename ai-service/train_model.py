@@ -3,14 +3,18 @@ import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
 
+import os
+from dotenv import load_dotenv
+
 def train_model():
+    load_dotenv()
 
     conn = psycopg2.connect(
-        host="localhost",
-        database="gastos_db",
-        user="postgres",
-        password="admin123",
-        port="5432"
+        host=os.getenv("DB_HOST", "localhost"),
+        database=os.getenv("DB_NAME", "gastos_db"),
+        user=os.getenv("DB_USER", "postgres"),
+        password=os.getenv("DB_PASSWORD", "admin123"),
+        port=os.getenv("DB_PORT", "5432")
     )
 
     query = """

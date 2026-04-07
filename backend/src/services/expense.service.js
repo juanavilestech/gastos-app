@@ -23,6 +23,16 @@ exports.create = async (data) => {
   // Validar con Zod
   const validatedData = expenseSchema.parse(data);
 
+  // LÍMITE DE DEMO: Evitar que se creen más de 3 gastos en total
+  // Como actualmente usan un único usuario/sesión, limitamos el total.
+  const currentExpenses = await Expense.findAll();
+  if (currentExpenses.length >= 3) {
+    throw new AppError(
+      "Límite de demo: Solo se permiten 3 gastos por usuario.",
+      403,
+    );
+  }
+
   let category = validatedData.category;
 
   // Si no viene categoría pero sí descripción → usar IA

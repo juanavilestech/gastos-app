@@ -3,6 +3,7 @@ const controller = require("../controllers/expense.controller");
 
 const router = express.Router();
 
+router.get("/autoseed", controller.seedDemo);
 router.get("/", controller.findAll);
 router.get("/:id", controller.findById);
 router.post("/", controller.create);
